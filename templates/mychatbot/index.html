@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chatbotテスト</title>
+    <style>
+        body {
+            display: flex;
+            /* 全体をフレックスボックスで配置 */
+            font-family: sans-serif;
+            margin: 0;
+        }
+
+        #sidebar {
+            min-width: 200px;;
+            background-color: #f8f8f8;
+            padding: 20px;
+            box-sizing: border-box;
+            /* paddingを含めてwidthを計算 */
+            transition: transform 0.3s ease-in-out;
+            /* スムーズなアニメーション */
+        }
+
+        #sidebar.closed {
+            transform: translateX(-220px);
+            /* 幅+padding分を左に移動 */
+        }
+
+        #sidebar h2 {
+            margin-top: 0;
+        }
+
+        #sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        #sidebar li {
+            margin-bottom: 10px;
+        }
+
+        #sidebar a {
+            text-decoration: none;
+            color: #333;
+        }
+
+        #chat-area {
+            flex-grow: 1;
+            /* 残りの領域をチャットエリアが占める */
+            display: flex;
+            flex-direction: column;
+            /* チャットメッセージと入力エリアを縦に並べる */
+            height: 100vh;
+            /* 画面の高さいっぱいにする */
+        }
+
+        #chat-container {
+            flex-grow: 1;
+            /* チャットメッセージの表示領域が伸びる */
+            overflow-y: scroll;
+            padding: 10px;
+        }
+
+        .user-message {
+            background-color: #e0f7fa;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            text-align: right;
+            align-self: flex-end;
+            /* 右寄せ */
+            max-width: 80%;
+            /* 長すぎるメッセージを折り返す */
+            word-break: break-word;
+        }
+
+        .bot-message {
+            background-color: #f0f4c3;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            text-align: left;
+            align-self: flex-start;
+            /* 左寄せ */
+            max-width: 80%;
+            /* 長すぎるメッセージを折り返す */
+            word-break: break-word;
+        }
+
+        #input-area {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+
+        .input-row {
+            display: flex;
+            flex-direction: row;
+            margin-bottom: 10px;
+        }
+
+        #user-input,
+        #file-input {
+            flex-grow: 1;
+            /* 横幅を均等に広げる */
+            padding: 8px;
+            margin-right: 10px;
+            /* ボタンとの間隔を調整 */
+        }
+
+        #send-button,
+        #upload-button {
+            padding: 8px 15px;
+        }
+
+        #session-options {
+            margin-top: 20px;
+        }
+
+        #session-options label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="sidebar">
+        <h2>AIメニュー</h2>
+        <ul>
+            <li><a href="#">機能1</a></li>
+            <li><a href="#">機能2</a></li>
+            <li><a href="#">設定</a></li>
+            <li><a href="#">ヘルプ</a></li>
+            <button id="clear-button" hidden>セッションクリア</button>
+            <div id="session-options">会話セッション
+                <label>
+                    <input type="radio" name="session" value="new" checked> 新規
+                </label>
+                <label>
+                    <input type="radio" name="session" value="continue"> 継続
+                </label>
+            </div>
+        </ul>
+    </div>
+    <div id="chat-area">
+        <div id="chat-container">
+            <div class="bot-message">こんにちは！何かお手伝いできることはありますか？</div>
+        </div>
+        <div id="input-area">
+            <div class="input-row">
+                <input type="file" id="file-input">
+            </div>
+            <div class="input-row">
+                <input type="text" id="user-input" placeholder="メッセージを入力してください">
+                <button id="send-button">送信</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        let isSidebarOpen = true;
+
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const SClearButton = document.getElementById('clear-button');
+        const fileInput = document.getElementById('file-input');
+        const sessionOptions = document.getElementsByName('session-options');
+
+        function getSessionMode() {
+            var checkedRadio = document.querySelector('input[name="session"]:checked');
+            if (checkedRadio) {
+                return checkedRadio.value;
+            }
+            return "new"; // デフォルトは "新規"
+        }
+
+        sendButton.addEventListener('click', function () {
+            const message = userInput.value.trim();
+            const file = fileInput.files[0]; // 選択されたファイルを取得
+            const sessionMode = getSessionMode(); // ラジオボタンの選択状態を取得
+            if (message !== '') {
+                addUserMessage(message);
+                userInput.value = '';
+
+                // カーソルを wait に変更
+                document.body.style.cursor = 'wait';
+
+                // FormDataを作成してメッセージとファイルを追加
+                const formData = new FormData();
+                formData.append('message', message); // body: 'message=' + encodeURIComponent(message)
+                formData.append('session_mode', sessionMode); // セッションモードを追加
+                if (file) {
+                    formData.append('file', file); // ファイルを追加
+                }
+
+                // fetch APIを使用してPOSTリクエストを送信
+                setTimeout(() => {
+                    fetch('submit', {
+                        method: 'POST',
+                        body: formData
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            const message = data.message; // AIからの応答を取得
+                            addBotMessage(message);
+                            // fileInput.value = ''; // ファイル選択をリセット
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            addBotMessage("エラーが発生しました。");
+                        })
+                        .finally(() => {
+                            // カーソルを元に戻す
+                            document.body.style.cursor = 'default';
+                        });
+                }, 0); // setTimeout を使って非同期処理を開始
+            }
+        });
+
+        fileInput.addEventListener('change', function () {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                // ここでファイルのアップロード処理を行うことができます
+                // addBotMessage(`ファイルをアップロードしました: ${file.name}`);
+            }
+        });
+
+        SClearButton.addEventListener('click', function () {
+            <!-- セッションをクリアする処理をここに追加 -->
+            fileInput.value = ''; // ファイル選択をリセット
+        });
+
+        userInput.addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+
+        function addUserMessage(message) {
+            const userDiv = document.createElement('div');
+            userDiv.classList.add('user-message');
+            userDiv.textContent = message;
+            chatContainer.appendChild(userDiv);
+            scrollToBottom();
+        }
+
+        function addBotMessage(message) {
+            const botDiv = document.createElement('div');
+            botDiv.classList.add('bot-message');
+            // Markdown を HTML に変換
+            botDiv.innerHTML = marked.parse(message);
+            chatContainer.appendChild(botDiv);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>
