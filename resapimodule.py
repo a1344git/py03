@@ -2,8 +2,25 @@ import openai
 import os
 import json
 
+# OpenAI APIキーを安全に取得する関数
+def get_secret():
+    """APIキーを取得する関数"""
+    api_key = os.getenv('OPENAI_API_KEY')
+    
+    if not api_key:
+        try:
+            with open('/run/secrets/openai_api_key', 'r') as f:
+                api_key = f.read().strip()
+        except (FileNotFoundError, IOError):
+            pass
+    
+    if not api_key:
+        raise Exception("APIキーが設定されていません")
+        
+    return api_key
+
 # OpenAI APIキーを設定
-openai.api_key = os.getenv('OPENAI_API_KEY')
+openai.api_key = get_secret()
 openai.timeout = 300  # タイムアウトを300秒に設定
 
 # 会話のidを保存
