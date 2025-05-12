@@ -1,0 +1,9 @@
+{# 履歴リスト: ユーザ発言のみクリック可能にし、data-id属性でIDを持たせる #}
+{% set user_histories = histories|selectattr('is_user', 'equalto', True)|sort(attribute='id', reverse=True)|list %}
+{% if user_histories %}
+    {% for h in user_histories %}
+        <li class="history-item" data-id="{{ h.id }}">{{ h.timestamp.strftime('%Y-%m-%d %H:%M') }}<br>{{ h.message|truncate(30) }}</li>
+    {% endfor %}
+{% else %}
+    <li>履歴はありません</li>
+{% endif %}

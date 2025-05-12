@@ -5,127 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>chatbotテスト</title>
-    <style>
-        body {
-            display: flex;
-            /* 全体をフレックスボックスで配置 */
-            font-family: sans-serif;
-            margin: 0;
-        }
-
-        #sidebar {
-            min-width: 200px;;
-            background-color: #f8f8f8;
-            padding: 20px;
-            box-sizing: border-box;
-            /* paddingを含めてwidthを計算 */
-            transition: transform 0.3s ease-in-out;
-            /* スムーズなアニメーション */
-        }
-
-        #sidebar.closed {
-            transform: translateX(-220px);
-            /* 幅+padding分を左に移動 */
-        }
-
-        #sidebar h2 {
-            margin-top: 0;
-        }
-
-        #sidebar ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        #sidebar li {
-            margin-bottom: 10px;
-        }
-
-        #sidebar a {
-            text-decoration: none;
-            color: #333;
-        }
-
-        #chat-area {
-            flex-grow: 1;
-            /* 残りの領域をチャットエリアが占める */
-            display: flex;
-            flex-direction: column;
-            /* チャットメッセージと入力エリアを縦に並べる */
-            height: 100vh;
-            /* 画面の高さいっぱいにする */
-        }
-
-        #chat-container {
-            flex-grow: 1;
-            /* チャットメッセージの表示領域が伸びる */
-            overflow-y: scroll;
-            padding: 10px;
-        }
-
-        .user-message {
-            background-color: #e0f7fa;
-            padding: 8px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            text-align: right;
-            align-self: flex-end;
-            /* 右寄せ */
-            max-width: 80%;
-            /* 長すぎるメッセージを折り返す */
-            word-break: break-word;
-        }
-
-        .bot-message {
-            background-color: #f0f4c3;
-            padding: 8px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            text-align: left;
-            align-self: flex-start;
-            /* 左寄せ */
-            max-width: 80%;
-            /* 長すぎるメッセージを折り返す */
-            word-break: break-word;
-        }
-
-        #input-area {
-            display: flex;
-            flex-direction: column;
-            padding: 10px;
-            border-top: 1px solid #ccc;
-        }
-
-        .input-row {
-            display: flex;
-            flex-direction: row;
-            margin-bottom: 10px;
-        }
-
-        #user-input,
-        #file-input {
-            flex-grow: 1;
-            /* 横幅を均等に広げる */
-            padding: 8px;
-            margin-right: 10px;
-            /* ボタンとの間隔を調整 */
-        }
-
-        #send-button,
-        #upload-button {
-            padding: 8px 15px;
-        }
-
-        #session-options {
-            margin-top: 20px;
-        }
-
-        #session-options label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='mychatbot/style.css') }}">
 </head>
 
 <body>
@@ -136,17 +16,31 @@
             <li><a href="#">機能2</a></li>
             <li><a href="#">設定</a></li>
             <li><a href="#">ヘルプ</a></li>
+            <li><a href="{{ url_for('logout') }}">ログアウト</a></li>
             <button id="clear-button" hidden>セッションクリア</button>
             <div id="session-options">会話セッション
                 <label>
-                    <input type="radio" name="session" value="new" checked> 新規
+                    <input type="radio" name="session" value="new"> 新規
                 </label>
                 <label>
-                    <input type="radio" name="session" value="continue"> 継続
+                    <input type="radio" name="session" value="continue" checked> 継続
                 </label>
             </div>
         </ul>
+        <hr>
+        <div style="font-weight:bold; margin-bottom:8px; color:#333;">ユーザー: {{ current_user.username }}</div>
+        <h3>チャット履歴</h3>
+        <ul>
+        {% if histories %}
+            {% for h in histories %}
+                <li class="history-item" data-id="{{ h.id }}">{{ h.timestamp.strftime('%Y-%m-%d %H:%M') }}<br>{{ h.message|truncate(30) }}</li>
+            {% endfor %}
+        {% else %}
+            <li>履歴はありません</li>
+        {% endif %}
+        </ul>
     </div>
+    <div id="sidebar-resizer" style="position:absolute;top:0;left:calc(220px + 20px);width:6px;height:100vh;cursor:ew-resize;z-index:10;"></div>
     <div id="chat-area">
         <div id="chat-container">
             <div class="bot-message">こんにちは！何かお手伝いできることはありますか？</div>
@@ -161,6 +55,7 @@
             </div>
         </div>
     </div>
+    {% block content %}{% endblock %}
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
@@ -179,10 +74,12 @@
             if (checkedRadio) {
                 return checkedRadio.value;
             }
-            return "new"; // デフォルトは "新規"
+            return "continue"; // デフォルトは "continue"
         }
 
-        sendButton.addEventListener('click', function () {
+        sendButton.addEventListener('click', function (event) {
+            event.preventDefault(); // フォーム送信によるリロード防止
+            console.log('送信ボタンがクリックされました');
             const message = userInput.value.trim();
             const file = fileInput.files[0]; // 選択されたファイルを取得
             const sessionMode = getSessionMode(); // ラジオボタンの選択状態を取得
@@ -192,6 +89,8 @@
 
                 // カーソルを wait に変更
                 document.body.style.cursor = 'wait';
+
+                showBotLoading(); // ぐるぐるアニメーション表示
 
                 // FormDataを作成してメッセージとファイルを追加
                 const formData = new FormData();
@@ -211,7 +110,22 @@
                         .then(data => {
                             const message = data.message; // AIからの応答を取得
                             addBotMessage(message);
-                            // fileInput.value = ''; // ファイル選択をリセット
+                            // チャット履歴を更新
+                            fetch('history')
+                                .then(res => res.text())
+                                .then(html => {
+                                    // サイドバーの履歴部分を書き換え
+                                    const parser = new DOMParser();
+                                    const doc = parser.parseFromString('<div>' + html + '</div>', 'text/html');
+                                    // _history.htmlは部分テンプレートなのでbodyタグなし。divでラップしてパース
+                                    const newLis = doc.querySelectorAll('li');
+                                    const sidebar = document.getElementById('sidebar');
+                                    const oldUl = sidebar.querySelector('h3 + ul');
+                                    if (oldUl) {
+                                        oldUl.innerHTML = '';
+                                        newLis.forEach(li => oldUl.appendChild(li));
+                                    }
+                                });
                         })
                         .catch(error => {
                             console.error('Error:', error);
@@ -228,8 +142,30 @@
         fileInput.addEventListener('change', function () {
             if (fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                // ここでファイルのアップロード処理を行うことができます
-                // addBotMessage(`ファイルをアップロードしました: ${file.name}`);
+                // プレビュー表示用要素を作成/更新
+                let preview = document.getElementById('file-preview');
+                if (!preview) {
+                    preview = document.createElement('span');
+                    preview.id = 'file-preview';
+                    preview.style.fontSize = '0.85em';
+                    preview.style.marginLeft = '10px';
+                    preview.style.verticalAlign = 'middle';
+                    fileInput.parentNode.appendChild(preview);
+                }
+                // 画像の場合はサムネイル、それ以外はファイル名のみ
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.innerHTML = `${file.name} <img src="${e.target.result}" style="height:32px;max-width:48px;margin-left:6px;vertical-align:middle;border:1px solid #ccc;border-radius:4px;">`;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    preview.textContent = file.name;
+                }
+            } else {
+                // ファイル未選択時はプレビューを消す
+                const preview = document.getElementById('file-preview');
+                if (preview) preview.remove();
             }
         });
 
@@ -253,6 +189,9 @@
         }
 
         function addBotMessage(message) {
+            // 既存のローディングアニメーションがあれば削除
+            const oldLoader = document.getElementById('bot-loader');
+            if (oldLoader) oldLoader.remove();
             const botDiv = document.createElement('div');
             botDiv.classList.add('bot-message');
             // Markdown を HTML に変換
@@ -261,9 +200,150 @@
             scrollToBottom();
         }
 
+        function showBotLoading() {
+            // 既存のローディングアニメーションがあれば削除
+            const oldLoader = document.getElementById('bot-loader');
+            if (oldLoader) oldLoader.remove();
+            const loaderDiv = document.createElement('div');
+            loaderDiv.classList.add('bot-message');
+            loaderDiv.id = 'bot-loader';
+            loaderDiv.innerHTML = `<span class="loader"></span> ...`;
+            chatContainer.appendChild(loaderDiv);
+            scrollToBottom();
+        }
+
         function scrollToBottom() {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
+
+        // 履歴クリックでAI回答をポップアップ表示
+        function showPopup(message) {
+            let popup = document.createElement('div');
+            popup.className = 'ai-popup';
+            popup.innerHTML = `
+                <button class="ai-popup-close" style="position:absolute;top:8px;right:12px;font-size:1.2em;cursor:pointer;background:none;border:none;">×</button>
+                <div class="ai-popup-inner">${marked.parse(message)}</div>
+            `;
+            document.body.appendChild(popup);
+            // 閉じるボタン
+            popup.querySelector('.ai-popup-close').onclick = () => popup.remove();
+        }
+
+        // 履歴リストのクリックイベント委譲
+        function attachHistoryClickHandler() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.addEventListener('click', function(e) {
+                const li = e.target.closest('.history-item');
+                if (li && li.dataset.id) {
+                    fetch(`/history/answer/${li.dataset.id}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            showPopup(data.answer);
+                        });
+                }
+            });
+        }
+        attachHistoryClickHandler();
+
+        // CSSアニメーション追加
+        const style = document.createElement('style');
+        style.innerHTML = `
+        .loader {
+            display: inline-block;
+            width: 1.5em;
+            height: 1.5em;
+            border: 3px solid #bdbdbd;
+            border-top: 3px solid #8bc34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .ai-popup {
+            position: fixed;
+            left: 50%;
+            top: 20%;
+            transform: translate(-50%, 0);
+            background: #fff;
+            color: #222;
+            border: 2px solid #8bc34a;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+            z-index: 9999;
+            padding: 0;
+            min-width: 240px;
+            max-width: 80vw;
+            animation: fadein 0.2s;
+        }
+        .ai-popup-inner {
+            padding: 18px 24px;
+            font-size: 1.1em;
+            word-break: break-all;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        @keyframes fadein {
+            from { opacity: 0; transform: translate(-50%, -20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .history-item {
+            cursor: pointer;
+            background: linear-gradient(90deg, #f6fff4 80%, #e0f7fa 100%);
+            transition: background 0.2s, box-shadow 0.2s;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            padding: 6px 8px;
+            position: relative;
+        }
+        .history-item:hover {
+            background: #d0f5e8;
+            box-shadow: 0 2px 8px rgba(140,195,74,0.08);
+        }
+        .history-item::after {
+            content: '💬';
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            font-size: 1.1em;
+            color: #8bc34a;
+            opacity: 0.7;
+        }`;
+        document.head.appendChild(style);
+
+        // サイドバーのリサイズ機能
+        const resizer = document.createElement('div');
+        resizer.id = 'sidebar-resizer';
+        resizer.style.position = 'absolute';
+        resizer.style.top = '0';
+        resizer.style.left = sidebar.offsetWidth + 'px';
+        resizer.style.width = '6px';
+        resizer.style.height = '100vh';
+        resizer.style.cursor = 'ew-resize';
+        resizer.style.zIndex = '10';
+        resizer.style.background = 'transparent';
+        document.body.appendChild(resizer);
+
+        let isResizing = false;
+        resizer.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            document.body.style.cursor = 'ew-resize';
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!isResizing) return;
+            let newWidth = e.clientX;
+            if (newWidth < 180) newWidth = 180;
+            if (newWidth > 350) newWidth = 350;
+            sidebar.style.width = newWidth + 'px';
+            resizer.style.left = newWidth + 'px';
+        });
+        document.addEventListener('mouseup', function(e) {
+            isResizing = false;
+            document.body.style.cursor = '';
+        });
     </script>
 </body>
 

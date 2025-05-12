@@ -1,0 +1,12 @@
+{% extends 'mychatbot/index.html' %}
+{% block content %}
+<h2>ユーザー登録</h2>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div>{{ form.username.label }} {{ form.username(size=32) }}</div>
+    <div>{{ form.password.label }} {{ form.password(size=32) }}</div>
+    <div>{{ form.confirm.label }} {{ form.confirm(size=32) }}</div>
+    <div>{{ form.submit() }}</div>
+</form>
+<a href="{{ url_for('login') }}">ログインはこちら</a>
+{% endblock %}
